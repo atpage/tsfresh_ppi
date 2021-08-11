@@ -4,6 +4,10 @@ This package provides some peak-to-peak timing features to augment `tsfresh`.
 Currently, `tsfresh` will find and count peaks using a couple of different methods.
 However, it does not measure the variability in timing between those peaks.
 
+## Installation
+
+Clone this repo.  Install prereqs from `requirements.txt`.  Then install the cloned directory, e.g. with `pip3 install -e [repo path]`.
+
 ## Usage
 
     from tsfresh import extract_features
