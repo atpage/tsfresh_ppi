@@ -128,6 +128,9 @@ def get_peak_locs(x, method, n, height=None, rel_height=0.5):
         peak_loc_times = peak_locs
     return peak_loc_times
 
+# TODO: find a way to prevent running these functions over and over
+# for the same inputs.
+
 def peaklocs_to_ppis(peak_locs):
     """peak_locs is a 1D array/series of peak locations, which may be
     represented as times or integers.  We'll convert it to the
