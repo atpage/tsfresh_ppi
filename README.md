@@ -1,12 +1,14 @@
 # tsfresh_ppi
 
-This package provides some peak-to-peak timing features to augment `tsfresh`.
+This package provides some peak-to-peak interval (PPI) variability features to augment `tsfresh` [1].
 Currently, `tsfresh` will find and count peaks using a couple of different methods.
 However, it does not measure the variability in timing between those peaks.
 
 ## Installation
 
-Clone this repo.  Install prereqs from `requirements.txt`.  Then install the cloned directory, e.g. with `pip3 install -e [repo path]`.
+Option 1: Clone this repo.  Install prereqs from `requirements.txt`.  Then install the cloned directory, e.g. with `pip3 install -e [repo path]`.
+
+Option 2: Install directly from PyPI (`tsfresh-ppi`).
 
 ## Usage
 
@@ -29,3 +31,5 @@ Clone this repo.  Install prereqs from `requirements.txt`.  Then install the clo
         ...
     )
 
+## References
+[1] https://github.com/blue-yonder/tsfresh
