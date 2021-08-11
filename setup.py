@@ -11,10 +11,10 @@ setuptools.setup(
     # description="A small example package",
     # long_description=long_description,
     # long_description_content_type="text/markdown",
-    # url="https://github.com/pypa/sampleproject",
-    # project_urls={
-    #     "Bug Tracker": "https://github.com/pypa/sampleproject/issues",
-    # },
+    url="https://github.com/atpage/tsfresh_ppi",
+    project_urls={
+        "Bug Tracker": "https://github.com/atpage/tsfresh_ppi/issues",
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         # "License :: OSI Approved :: MIT License",
