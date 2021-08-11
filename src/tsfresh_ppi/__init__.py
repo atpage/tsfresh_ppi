@@ -4,7 +4,7 @@ import pandas as pd
 from scipy.signal import find_peaks, find_peaks_cwt, ricker
 from tsfresh.feature_extraction.feature_calculators import set_property, _roll
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
-#from tsfresh.utilities.string_manipulation import convert_to_output_format
+from tsfresh.utilities.string_manipulation import convert_to_output_format
 
 """These functions return various measures of "peak-to-peak" timing.
 Peaks could represent, for example, steps in an accelerometer signal,
@@ -146,11 +146,34 @@ def peaklocs_to_ppis(peak_locs):
     ppis = peak_locs[1:] - peak_locs[:-1]
     return ppis
 
-############################# Feature calculators: #############################
+######################### Combined feature calculator: #########################
+
+# @set_property("fctype", "combiner")
+# @set_property("input", "pd.Series")
+# def ppi_features(x, method, n, ms):
+#     """
+#     Short description of your feature (should be a one liner as we parse the first line of the description)
+#     Long detailed description, add somme equations, add some references, what kind of statistics is the feature
+#     capturing? When should you use it? When not?
+#     :param x: the time series to calculate the feature of
+#     :type x: pandas.Series
+#     :param c: the time series name
+#     :type c: str
+#     :param param: contains dictionaries {"p1": x, "p2": y, ...} with p1 float, p2 int ...
+#     :type param: list
+#     :return: list of tuples (s, f) where s are the parameters, serialized as a string,
+#              and f the respective feature value as bool, int or float
+#     :return type: pandas.Series
+#     """
+#     # Do some pre-processing if needed for all parameters
+#     # f is a function that calculates the feature value for each single parameter combination
+#     return [(convert_to_output_format(config), f(x, config)) for config in param]
+
+####################### Individual feature calculators: ########################
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_npeaks(x, method, n):
+def ppi_npeaks(x, method, n, peak_locs=None):
     """
     Number of peaks.
 
@@ -165,15 +188,16 @@ def ppi_npeaks(x, method, n):
     """
     # TODO: this is not useful yet, because tsfresh already computes
     # this.  but adding more parameters will make it different.
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
+    if peak_locs is None:
+        try:
+            peak_locs = get_peak_locs(x, method, n)
+        except:
+            return np.nan
     return len(peak_locs)
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_stdev(x, method, n):
+def ppi_stdev(x, method, n, peak_locs=None, ppis=None):
     """
     Standard deviation in peak-to-peak intervals.
 
@@ -186,20 +210,22 @@ def ppi_stdev(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     return np.std(ppis)
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_rmssd(x, method, n):
+def ppi_rmssd(x, method, n, peak_locs=None, ppis=None):
     """
     Root mean square of successive differences between adjacent peak-to-peak intervals.
 
@@ -212,13 +238,15 @@ def ppi_rmssd(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     differences = ppis[1:] - ppis[:-1]
@@ -229,7 +257,7 @@ def ppi_rmssd(x, method, n):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_sdsd(x, method, n):
+def ppi_sdsd(x, method, n, peak_locs=None, ppis=None):
     """
     Standard deviation of the successive differences between adjacent peak-to-peak intervals.
 
@@ -242,13 +270,15 @@ def ppi_sdsd(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     differences = ppis[1:] - ppis[:-1]
@@ -256,7 +286,7 @@ def ppi_sdsd(x, method, n):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_nn(x, method, n, ms):
+def ppi_nn(x, method, n, ms, peak_locs=None, ppis=None):
     """The number of pairs of successive peak-to-peak intervals that
     differ by more than `ms` ms in the case of a DatetimeIndex, or by
     `ms` samples otherwise.
@@ -272,13 +302,15 @@ def ppi_nn(x, method, n, ms):
     :return: the value of this feature
     :return type: int
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
         ms = ms / 1000.0
@@ -287,7 +319,7 @@ def ppi_nn(x, method, n, ms):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_pnn(x, method, n, ms):
+def ppi_pnn(x, method, n, ms, peak_locs=None, ppis=None):
     """
     The proportion of nn(peak_locs, ms) divided by total number of peak-to-peak intervals.
 
@@ -302,16 +334,20 @@ def ppi_pnn(x, method, n, ms):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    num_ppis = len(peak_locs) - 1
-    over = ppi_nn(x, method, n, ms)
-    result = float(over) / num_ppis
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
+    over = ppi_nn(x, method, n, ms, ppis=ppis)
+    result = float(over) / len(ppis)
     return result
+
+# TODO: don't keep repeating boilerplate stuff in each feature calculator
 
 ################################################################################
 
