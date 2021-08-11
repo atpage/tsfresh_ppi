@@ -54,9 +54,9 @@ def get_peak_locs(x, method, n, height=None, rel_height=0.5):
     """
     # TODO: how to handle missed samples/frames with int index?
     # e.g. if index goes [1, 3, 4, 5, 8, 9, 12] and we find peaks at
-    # iloc 2 and 5, we'll think that the distance between them is 3,
-    # but really it was 5 samples.  there may be nothing we can do,
-    # unless user specifies a "sample #" index level.
+    # iloc 2 and 5, we'll think that the distance between them is 3
+    # (rows), but really it was 5 (samples).  there may be nothing we
+    # can do, unless user specifies a "sample #" index level.
     if type(x) != pd.Series:
         raise TypeError
     # Find peaks:
