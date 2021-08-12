@@ -368,6 +368,8 @@ def ppi_pnn(x, method, n, ms, peak_locs=None, ppis=None, **kwargs):
             if len(peak_locs) < 3:
                 return np.nan
         ppis = peaklocs_to_ppis(peak_locs)
+    if len(ppis) < 1:
+        return np.nan
     over = ppi_nn(x, method, n, ms, ppis=ppis)
     result = float(over) / len(ppis)
     return result
