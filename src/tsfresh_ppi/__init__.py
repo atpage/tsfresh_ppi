@@ -4,7 +4,7 @@ import pandas as pd
 from scipy.signal import find_peaks, find_peaks_cwt, ricker
 from tsfresh.feature_extraction.feature_calculators import set_property, _roll
 from tsfresh.feature_extraction.settings import ComprehensiveFCParameters
-#from tsfresh.utilities.string_manipulation import convert_to_output_format
+from tsfresh.utilities.string_manipulation import convert_to_output_format
 
 """These functions return various measures of "peak-to-peak" timing.
 Peaks could represent, for example, steps in an accelerometer signal,
@@ -17,7 +17,8 @@ rhythm analysis."""
 
 ############################## Helper functions: ###############################
 
-def get_fc_parameters( method_options = ['normal','tsfresh','cwt'],
+def get_fc_parameters( features = ['stdev','rmssd','sdsd','nn','pnn'],  # TODO: npeaks
+                       method_options = ['normal','tsfresh','cwt'],
                        n_options = [1,3,5,10,15,20,25,50],
                        ms_options = [20,50],
                        include_comprehensive_defaults = True):
@@ -32,16 +33,13 @@ def get_fc_parameters( method_options = ['normal','tsfresh','cwt'],
         params = ComprehensiveFCParameters()
     else:
         params = {}
-    standard_params = [{'method': m, 'n': n} for m in method_options for n in n_options]
-    extended_params = [{'method': m, 'n': n, 'ms': ms} for m in method_options for n in n_options for ms in ms_options]
+    nn_features = [f for f in features if 'nn' in f]
+    non_nn_features = [f for f in features if 'nn' not in f]
+    standard_params = [{'feature': f, 'method': m, 'n': n} for f in non_nn_features for m in method_options for n in n_options]
+    extended_params = [{'feature': f, 'method': m, 'n': n, 'ms': ms} for f in nn_features for m in method_options for n in n_options for ms in ms_options]
     # TODO: rel_height = [0.25, 0.5, 0.75, 1.0] for 'normal' method
     # TODO: height = [0, None]?  0 might work for a wander-corrected signal.
-    params[ppi_stdev] = standard_params
-    params[ppi_rmssd] = standard_params
-    params[ppi_sdsd] = standard_params
-    params[ppi_nn] = extended_params
-    params[ppi_pnn] = extended_params
-    # TODO: ppi_npeaks
+    params[ppi] = standard_params + extended_params
     return params
 
 def get_peak_locs(x, method, n, height=None, rel_height=0.5):
@@ -128,16 +126,6 @@ def get_peak_locs(x, method, n, height=None, rel_height=0.5):
         peak_loc_times = peak_locs
     return peak_loc_times
 
-# TODO: find a way to prevent running these functions over and over
-# for the same inputs.  (see 'combiner' custom feature type, with
-# explanation and examples in
-# https://tsfresh.readthedocs.io/en/latest/text/how_to_add_custom_feature.html
-# and
-# https://github.com/blue-yonder/tsfresh/blob/main/tsfresh/feature_extraction/feature_calculators.py)
-# (combiner may not actually work... it seems to be for iterating over
-# different parameters, not different features with the same
-# parameters.  cache results on disk/memory somehow?)
-
 def peaklocs_to_ppis(peak_locs):
     """peak_locs is a 1D array/series of peak locations, which may be
     represented as times or integers.  We'll convert it to the
@@ -149,11 +137,68 @@ def peaklocs_to_ppis(peak_locs):
     ppis = peak_locs[1:] - peak_locs[:-1]
     return ppis
 
-############################# Feature calculators: #############################
+######################### Combined feature calculator: #########################
+
+@set_property("fctype", "combiner")
+@set_property("input", "pd.Series")
+def ppi(x, param):
+    """
+    Calculates various peak-to-peak interval statistics, like RMSSD and pNN.
+
+    This function uses the given parameters (`method` and `n`) to
+    detect the peaks in x.  It then returns standard deviation, RMSSD,
+    SDSD, NN, and PNN based on the peak-to-peak intervals (PPIs) it
+    found.  These features are typically used to characterize cardiac
+    arrhythmias.
+
+    :param x: the time series to calculate the feature of
+    :type x: pandas.Series
+    :param param: contains dictionaries {'feature': f, 'method': m,
+                  'n': n, 'ms': ms} with f str e.g. 'rmssd', m str
+                  e.g. 'cwt', n int, ms int/float
+    :type param: list
+    :return: list of tuples (s, f) where s are the parameters, serialized as a string,
+             and f the respective feature value as int or float
+    :return type: pandas.Series
+    """
+    function_map = {
+        'stdev': ppi_stdev,
+        'rmssd': ppi_rmssd,
+        'sdsd': ppi_sdsd,
+        'nn': ppi_nn,
+        'pnn': ppi_pnn,
+        # TODO: ppi_npeaks
+    }
+    res = {}
+    # Find the unique sets of parameters (method, n).  For each one of
+    # them, we only need to find the peaks once.
+    params_df = pd.DataFrame(param)
+    unique_params = params_df[['method','n']].drop_duplicates()
+    unique_params_dicts = unique_params.T.to_dict()
+    for k, params in unique_params_dicts.items():
+        peak_locs = get_peak_locs(x, method=params['method'], n=params['n'])
+        ppis = peaklocs_to_ppis(peak_locs)  # TODO: only if some features need it?
+        # Now that we know the peak locations based on this set of
+        # params, we can compute all the PPI features.
+        for idx, row in params_df.iterrows():
+            if row['method']==params['method'] and row['n']==params['n']:
+                output_key = convert_to_output_format(row)
+                result = function_map[row['feature']](
+                    x = x,
+                    method = row['method'],
+                    n = row['n'],
+                    ms = row['ms'] if 'ms' in row else None,
+                    peak_locs = peak_locs,
+                    ppis = ppis,
+                )
+                res[output_key] = result
+    return [(key, value) for key, value in res.items()]
+
+####################### Individual feature calculators: ########################
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_npeaks(x, method, n):
+def ppi_npeaks(x, method, n, peak_locs=None, **kwargs):
     """
     Number of peaks.
 
@@ -168,15 +213,16 @@ def ppi_npeaks(x, method, n):
     """
     # TODO: this is not useful yet, because tsfresh already computes
     # this.  but adding more parameters will make it different.
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
+    if peak_locs is None:
+        try:
+            peak_locs = get_peak_locs(x, method, n)
+        except:
+            return np.nan
     return len(peak_locs)
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_stdev(x, method, n):
+def ppi_stdev(x, method, n, peak_locs=None, ppis=None, **kwargs):
     """
     Standard deviation in peak-to-peak intervals.
 
@@ -189,20 +235,22 @@ def ppi_stdev(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     return np.std(ppis)
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_rmssd(x, method, n):
+def ppi_rmssd(x, method, n, peak_locs=None, ppis=None, **kwargs):
     """
     Root mean square of successive differences between adjacent peak-to-peak intervals.
 
@@ -215,13 +263,15 @@ def ppi_rmssd(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     differences = ppis[1:] - ppis[:-1]
@@ -232,7 +282,7 @@ def ppi_rmssd(x, method, n):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_sdsd(x, method, n):
+def ppi_sdsd(x, method, n, peak_locs=None, ppis=None, **kwargs):
     """
     Standard deviation of the successive differences between adjacent peak-to-peak intervals.
 
@@ -245,13 +295,15 @@ def ppi_sdsd(x, method, n):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
     differences = ppis[1:] - ppis[:-1]
@@ -259,7 +311,7 @@ def ppi_sdsd(x, method, n):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_nn(x, method, n, ms):
+def ppi_nn(x, method, n, ms, peak_locs=None, ppis=None, **kwargs):
     """The number of pairs of successive peak-to-peak intervals that
     differ by more than `ms` ms in the case of a DatetimeIndex, or by
     `ms` samples otherwise.
@@ -275,13 +327,15 @@ def ppi_nn(x, method, n, ms):
     :return: the value of this feature
     :return type: int
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
-        return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    ppis = peaklocs_to_ppis(peak_locs)
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
         ms = ms / 1000.0
@@ -290,7 +344,7 @@ def ppi_nn(x, method, n, ms):
 
 @set_property("fctype", "simple")
 @set_property("input", "pd.Series")
-def ppi_pnn(x, method, n, ms):
+def ppi_pnn(x, method, n, ms, peak_locs=None, ppis=None, **kwargs):
     """
     The proportion of nn(peak_locs, ms) divided by total number of peak-to-peak intervals.
 
@@ -305,16 +359,22 @@ def ppi_pnn(x, method, n, ms):
     :return: the value of this feature
     :return type: float
     """
-    try:
-        peak_locs = get_peak_locs(x, method, n)
-    except:
+    if ppis is None:
+        if peak_locs is None:
+            try:
+                peak_locs = get_peak_locs(x, method, n)
+            except:
+                return np.nan
+            if len(peak_locs) < 3:
+                return np.nan
+        ppis = peaklocs_to_ppis(peak_locs)
+    if len(ppis) < 1:
         return np.nan
-    if len(peak_locs) < 3:
-        return np.nan
-    num_ppis = len(peak_locs) - 1
-    over = ppi_nn(x, method, n, ms)
-    result = float(over) / num_ppis
+    over = ppi_nn(x, method, n, ms, ppis=ppis)
+    result = float(over) / len(ppis)
     return result
+
+# TODO: don't keep repeating boilerplate stuff in each feature calculator
 
 ################################################################################
 
