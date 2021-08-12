@@ -39,7 +39,7 @@ def get_fc_parameters( features = ['stdev','rmssd','sdsd','nn','pnn'],  # TODO: 
     extended_params = [{'feature': f, 'method': m, 'n': n, 'ms': ms} for f in nn_features for m in method_options for n in n_options for ms in ms_options]
     # TODO: rel_height = [0.25, 0.5, 0.75, 1.0] for 'normal' method
     # TODO: height = [0, None]?  0 might work for a wander-corrected signal.
-    params[ppi_features] = standard_params + extended_params
+    params[ppi] = standard_params + extended_params
     return params
 
 def get_peak_locs(x, method, n, height=None, rel_height=0.5):
@@ -141,9 +141,9 @@ def peaklocs_to_ppis(peak_locs):
 
 @set_property("fctype", "combiner")
 @set_property("input", "pd.Series")
-def ppi_features(x, param):  # TODO?: rename to ppi or ppi_variability or something?
+def ppi(x, param):
     """
-    Compute various PPI statistics, like RMSSD and SDSD.
+    Calculates various peak-to-peak interval statistics, like RMSSD and pNN.
 
     This function uses the given parameters (`method` and `n`) to
     detect the peaks in x.  It then returns standard deviation, RMSSD,
