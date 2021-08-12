@@ -134,6 +134,9 @@ def get_peak_locs(x, method, n, height=None, rel_height=0.5):
 # https://tsfresh.readthedocs.io/en/latest/text/how_to_add_custom_feature.html
 # and
 # https://github.com/blue-yonder/tsfresh/blob/main/tsfresh/feature_extraction/feature_calculators.py)
+# (combiner may not actually work... it seems to be for iterating over
+# different parameters, not different features with the same
+# parameters.  cache results on disk/memory somehow?)
 
 def peaklocs_to_ppis(peak_locs):
     """peak_locs is a 1D array/series of peak locations, which may be
