@@ -1,4 +1,6 @@
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks, find_peaks_cwt, ricker
@@ -114,13 +116,11 @@ def get_peak_locs(x, method, n, height=None, rel_height=0.5):
     elif type(x.index) == pd.DatetimeIndex:
         dt_level_name = x.index.name
     # Convert peak locations to times, if we can:
+    if len(peak_locs)==0:
+        warnings.warn("Couldn't find any peaks in signal.")
+        return np.array([])
     if dt_level_name is not None:
-        try:
-            peak_loc_times = x.index.get_level_values(dt_level_name)[peak_locs]
-        except IndexError:
-            # we'll get here if peak_locs is empty, for instance.
-            raise
-            # TODO: anything else/different to do here?
+        peak_loc_times = x.index.get_level_values(dt_level_name)[peak_locs]
     else:
         # just keep the integer indexing
         peak_loc_times = peak_locs
