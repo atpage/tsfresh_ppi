@@ -339,7 +339,8 @@ def ppi_nn(x, method, n, ms, peak_locs=None, ppis=None, **kwargs):
     if type(ppis) == pd.TimedeltaIndex:
         ppis = ppis.total_seconds()
         ms = ms / 1000.0
-    count = np.sum(ppis > ms)
+    differences = ppis[1:] - ppis[:-1]
+    count = np.sum(abs(differences) > ms)
     return count
 
 @set_property("fctype", "simple")
