@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="tsfresh_ppi",
-    version="2021.8.12",
+    version="2021.8.29",
     author="Alex Page",
     author_email="a.t.page@gmail.com",
     description="Add peak-to-peak interval features to tsfresh",
